@@ -157,6 +157,7 @@ def create_acc(region, custom_prefix=None, max_retries=3):
     
     for attempt in range(max_retries):
         try:
+            print(f"{Fore.YELLOW}[*] Intentando registro de invitado (Intento {attempt+1})...")
             password = generate_custom_password()
             data = f"password={password}&client_type=2&source=2&app_id=100067"
             message = data.encode('utf-8')
@@ -168,16 +169,25 @@ def create_acc(region, custom_prefix=None, max_retries=3):
                 "Content-Type": "application/x-www-form-urlencoded"
             }
             response = requests.post(url, headers=headers, data=data, timeout=30)
+            print(f"{Fore.BLUE}[DEBUG] Register Response: {response.status_code}")
             if response.status_code == 200:
                 uid = response.json().get('uid')
                 if uid:
-                    return token(uid, password, region, custom_prefix)
+                    print(f"{Fore.GREEN}[+] UID generado: {uid}")
+                    res = token(uid, password, region, custom_prefix)
+                    if isinstance(res, dict): return res
+                    return f"Error en paso: {res}"
+                return "Garena no devolvió UID"
+            elif response.status_code == 403: return "IP Bloqueada o Firma Inválida (403)"
             time.sleep(1)
-        except: continue
-    return None
+        except Exception as e:
+            print(f"{Fore.RED}[!!] Error en create_acc: {e}")
+            return str(e)
+    return "Máximos intentos alcanzados"
 
 def token(uid , password , region, custom_prefix=None):
     try:
+        print(f"{Fore.YELLOW}[*] Solicitando token de acceso...")
         url = "https://100067.connect.garena.com/oauth/guest/token/grant"
         data = {
             "uid": uid,
@@ -188,10 +198,12 @@ def token(uid , password , region, custom_prefix=None):
             "client_id": "100067",
         }
         response = requests.post(url, data=data, timeout=30)
+        print(f"{Fore.BLUE}[DEBUG] Token Response: {response.status_code}")
         if response.status_code == 200:
             json_response = response.json()
-            access_token = json_response['access_token']
-            open_id = json_response['open_id']
+            access_token = json_response.get('access_token')
+            open_id = json_response.get('open_id')
+            if not access_token: return "Token no recibido"
             encoded = ""
             keystream = [0x30, 0x30, 0x30, 0x32, 0x30, 0x31, 0x37, 0x30] * 4
             for i in range(len(open_id)):
@@ -199,10 +211,14 @@ def token(uid , password , region, custom_prefix=None):
             field = ''.join(c if 32 <= ord(c) <= 126 else f'\\u{ord(c):04x}' for c in encoded)
             field = codecs.decode(field, 'unicode_escape').encode('latin1')
             return Major_Register(access_token, open_id, field, uid, password, region, custom_prefix)
-    except: return None
+        return f"Token Error ({response.status_code})"
+    except Exception as e:
+        print(f"{Fore.RED}[!!] Error en token: {e}")
+        return f"Token Exception: {str(e)}"
 
 def Major_Register(access_token , open_id , field , uid , password, region, custom_prefix=None):
     try:
+        print(f"{Fore.YELLOW}[*] Ejecutando Major_Register...")
         url = "https://loginbp.ggblueshark.com/MajorRegister"
         name = generate_random_name(custom_prefix=custom_prefix, region=region)
         headers = {
@@ -215,39 +231,50 @@ def Major_Register(access_token , open_id , field , uid , password, region, cust
         payload = CrEaTe_ProTo(payload_fields).hex()
         body = bytes.fromhex(E_AEs(payload).hex())
         response = requests.post(url, headers=headers, data=body, verify=False, timeout=30)
+        print(f"{Fore.BLUE}[DEBUG] MajorRegister Response: {response.status_code}")
         if response.status_code == 200:
             return login(uid , password, access_token , open_id, name , region)
-    except: return None
+        return f"MajorRegister Error ({response.status_code})"
+    except Exception as e:
+        print(f"{Fore.RED}[!!] Error en Major_Register: {e}")
+        return f"MajorRegister Exception: {str(e)}"
 
 def login(uid , password, access_token , open_id, name , region):
-    lang = get_region(region).encode("ascii")
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "ReleaseVersion": "OB52",
-        "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 9; ASUS_I005DA Build/PI)"
-    }    
-    payload = b'\x1a\x132025-08-30 05:19:21"\tfree fire(\x01:\x081.114.13B2Android OS 9 / API-28 (PI/rel.cjw.20220518.114133)J\x08HandheldR\nATM MobilsZ\x04WIFI`\xb6\nh\xee\x05r\x03300z\x1fARMv7 VFPv3 NEON VMH | 2400 | 2\x80\x01\xc9\x0f\x8a\x01\x0fAdreno (TM) 640\x92\x01\rOpenGL ES 3.2\x9a\x01+Google|dfa4ab4b-9dc4-454e-8065-e70c733fa53f\xa2\x01\x0e105.235.139.91\xaa\x01\x02'+lang+b'\xb2\x01 1d8ec0240ede109973f3321b9354b44d\xba\x01\x014\xc2\x01\x08Handheld\xca\x01\x10Asus ASUS_I005DA\xea\x01@afcfbf13334be42036e4f742c80b956344bed760ac91b3aff9b607a610ab4390\xf0\x01\x01\xca\x02\nATM Mobils\xd2\x02\x04WIFI\xca\x03 7428b253defc164018c604a1ebbfebdf\xe0\x03\xa8\x81\x02\xe8\x03\xf6\xe5\x01\xf0\x03\xaf\x13\xf8\x03\x84\x07\x80\x04\xe7\xf0\x01\x88\x04\xa8\x81\x02\x90\x04\xe7\xf0\x01\x98\x04\xa8\x81\x02\xc8\x04\x01\xd2\x04=/data/app/com.dts.freefireth-PdeDnOilCSFn37p1AH_FLg==/lib/arm\xe0\x04\x01\xea\x04_2087f61c19f57f2af4e7feff0b24d9d9|/data/app/com.dts.freefireth-PdeDnOilCSFn37p1AH_FLg==/base.apk\xf0\x04\x03\xf8\x04\x01\x8a\x05\x0232\x9a\x05\n2019118692\xb2\x05\tOpenGLES2\xb8\x05\xff\x7f\xc0\x05\x04\xe0\x05\xf3F\xea\x05\x07android\xf2\x05pKqsHT5ZLWrYljNb5Vqh//yFRlaPHSO9NWSQsVvOmdhEEn7W+VHNUK+Q+fduA3ptNrGB0Ll0LRz3WW0jOwesLj6aiU7sZ40p8BfUE/FI/jzSTwRe2\xf8\x05\xfb\xe4\x06\x88\x06\x01\x90\x06\x01\x9a\x06\x014\xa2\x06\x014\xb2\x06"GQ@O\x00\x0e^\x00D\x06UA\x0ePM\r\x13hZ\x07T\x06\x0cm\\V\x0ejYV;\x0bU5'
-    data = payload.replace(b'afcfbf13334be42036e4f742c80b956344bed760ac91b3aff9b607a610ab4390', access_token.encode())
-    data = data.replace(b'1d8ec0240ede109973f3321b9354b44d', open_id.encode())
-    
-    # Encrypt and send
-    key_login = bytes([89, 103, 38, 116, 99, 37, 68, 69, 117, 104, 54, 37, 90, 99, 94, 56])
-    iv_login = bytes([54, 111, 121, 90, 68, 114, 50, 50, 69, 51, 121, 99, 104, 106, 77, 37])
-    cipher = AES.new(key_login, AES.MODE_CBC, iv_login)
-    body = cipher.encrypt(pad(bytes.fromhex(data.hex()), AES.block_size))
-    
-    url = "https://loginbp.common.ggbluefox.com/MajorLogin" if region.lower() == "me" else "https://loginbp.ggblueshark.com/MajorLogin"
-    response = requests.post(url, headers=headers, data=body, verify=False, timeout=30)
-    
-    if response.status_code == 200:
-        return {
-            "status_code": 200, 
-            "name": name, 
-            "uid": str(uid), 
-            "password": str(password),
-            "region": region
-        }
-    return None
+    try:
+        print(f"{Fore.YELLOW}[*] Ejecutando MajorLogin final...")
+        lang = get_region(region).encode("ascii")
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "ReleaseVersion": "OB50",
+            "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 9; ASUS_I005DA Build/PI)"
+        }    
+        # Usando payload original estable
+        payload = b'\x1a\x132024-08-30 05:19:21"\tfree fire(\x01:\x081.101.1B2Android OS 9 / API-28 (PI/rel.cjw.20220518.114133)J\x08HandheldR\nATM MobilsZ\x04WIFI`\xb6\nh\xee\x05r\x03300z\x1fARMv7 VFPv3 NEON VMH | 2400 | 2\x80\x01\xc9\x0f\x8a\x01\x0fAdreno (TM) 640\x92\x01\rOpenGL ES 3.2\x9a\x01+Google|dfa4ab4b-9dc4-454e-8065-e70c733fa53f\xa2\x01\x0e105.235.139.91\xaa\x01\x02'+lang+b'\xb2\x01 1d8ec0240ede109973f3321b9354b44d\xba\x01\x014\xc2\x01\x08Handheld\xca\x01\x10Asus ASUS_I005DA\xea\x01@afcfbf13334be42036e4f742c80b956344bed760ac91b3aff9b607a610ab4390\xf0\x01\x01\xca\x02\nATM Mobils\xd2\x02\x04WIFI\xca\x03 7428b253defc164018c604a1ebbfebdf\xe0\x03\xa8\x81\x02\xe8\x03\xf6\xe5\x01\xf0\x03\xaf\x13\xf8\x03\x84\x07\x80\x04\xe7\xf0\x01\x88\x04\xa8\x81\x02\x90\x04\xe7\xf0\x01\x98\x04\xa8\x81\x02\xc8\x04\x01\xd2\x04=/data/app/com.dts.freefireth-PdeDnOilCSFn37p1AH_FLg==/lib/arm\xe0\x04\x01\xea\x04_2087f61c19f57f2af4e7feff0b24d9d9|/data/app/com.dts.freefireth-PdeDnOilCSFn37p1AH_FLg==/base.apk\xf0\x04\x03\xf8\x04\x01\x8a\x05\x0232\x9a\x05\n2019118692\xb2\x05\tOpenGLES2\xb8\x05\xff\x7f\xc0\x05\x04\xe0\x05\xf3F\xea\x05\x07android\xf2\x05pKqsHT5ZLWrYljNb5Vqh//yFRlaPHSO9NWSQsVvOmdhEEn7W+VHNUK+Q+fduA3ptNrGB0Ll0LRz3WW0jOwesLj6aiU7sZ40p8BfUE/FI/jzSTwRe2\xf8\x05\xfb\xe4\x06\x88\x06\x01\x90\x06\x01\x9a\x06\x014\xa2\x06\x014\xb2\x06"GQ@O\x00\x0e^\x00D\x06UA\x0ePM\r\x13hZ\x07T\x06\x0cm\\V\x0ejYV;\x0bU5'
+        data = payload.replace(b'afcfbf13334be42036e4f742c80b956344bed760ac91b3aff9b607a610ab4390', access_token.encode())
+        data = data.replace(b'1d8ec0240ede109973f3321b9354b44d', open_id.encode())
+        
+        # Encrypt and send
+        key_login = bytes([89, 103, 38, 116, 99, 37, 68, 69, 117, 104, 54, 37, 90, 99, 94, 56])
+        iv_login = bytes([54, 111, 121, 90, 68, 114, 50, 50, 69, 51, 121, 99, 104, 106, 77, 37])
+        cipher = AES.new(key_login, AES.MODE_CBC, iv_login)
+        body = cipher.encrypt(pad(data, AES.block_size))
+        
+        url = "https://loginbp.common.ggbluefox.com/MajorLogin" if region.lower() == "me" else "https://loginbp.ggblueshark.com/MajorLogin"
+        response = requests.post(url, headers=headers, data=body, verify=False, timeout=30)
+        print(f"{Fore.BLUE}[DEBUG] MajorLogin Response: {response.status_code}")
+        
+        if response.status_code == 200:
+            return {
+                "status_code": 200, 
+                "name": name, 
+                "uid": str(uid), 
+                "password": str(password),
+                "region": region
+            }
+        return f"Login Error ({response.status_code})"
+    except Exception as e:
+        print(f"{Fore.RED}[!!] Error en login: {e}")
+        return f"Login Exception: {str(e)}"
 
 # --- Database Management ---
 
@@ -352,10 +379,11 @@ async def crear(interaction: discord.Interaction, region: str, prefijo: str = "Z
     msg = await interaction.followup.send(embed=embed_init)
 
     successful = []
+    last_error = "Ninguno"
     for i in range(min(cantidad, 10)):
         try:
             r = await asyncio.to_thread(create_acc, region, prefijo)
-            if r:
+            if isinstance(r, dict):
                 successful.append(r)
                 embed_acc = discord.Embed(title=f"✅ CUENTA #{len(successful)}", color=0x8A2BE2)
                 embed_acc.add_field(name="🆔 UID", value=f"`{r['uid']}`", inline=True)
@@ -363,7 +391,11 @@ async def crear(interaction: discord.Interaction, region: str, prefijo: str = "Z
                 embed_acc.add_field(name="🌍 REGIÓN", value=f"`{region}`", inline=True)
                 await interaction.channel.send(embed=embed_acc)
                 await asyncio.sleep(1)
-        except: continue
+            else:
+                last_error = r if r else "Fallo desconocido"
+        except Exception as e:
+            last_error = str(e)
+            continue
 
     if successful:
         db = load_db()
@@ -376,7 +408,7 @@ async def crear(interaction: discord.Interaction, region: str, prefijo: str = "Z
         embed_final = discord.Embed(title="🏁 PROCESO COMPLETADO", description=f"Se entregaron **{len(successful)}** cuentas con éxito.", color=0x00FF7F)
         await interaction.channel.send(content=f"<@{user_id}>", embed=embed_final)
     else:
-        await interaction.followup.send("❌ Error Crítico: No se pudo generar la cuenta.")
+        await interaction.followup.send(f"❌ **Error Crítico:** No se pudo generar la cuenta.\n📌 **Detalle:** `{last_error}`")
 
 @bot.tree.command(name="info", description="Ver tu perfil ZENIHT")
 async def info(interaction: discord.Interaction):
