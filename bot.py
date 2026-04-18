@@ -267,13 +267,23 @@ class ZENIHTBot(commands.Bot):
         intents = discord.Intents.default() ; intents.message_content = True
         super().__init__(command_prefix="/", intents=intents)
     async def setup_hook(self): await self.tree.sync()
-    async def on_ready(self): print(f"ZENIHT ONLINE: {self.user}")
+    async def on_ready(self): 
+        print(f"\n{Fore.CYAN}======================================")
+        print(f"{Fore.GREEN} ZENIHT BOT ONLINE: {self.user}")
+        print(f"{Fore.YELLOW} VERSION: 2.1 (Hardened)")
+        print(f"{Fore.CYAN}======================================\n")
+        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Free Fire Gen"))
 
 bot = ZENIHTBot()
 
 @bot.tree.command(name="crear", description="Gen FF")
 async def crear(interaction: discord.Interaction, region: str, prefijo: str = "ZENIHT", cantidad: int = 1):
-    if not interaction.response.is_done(): await interaction.response.defer()
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+    except Exception as e:
+        print(f"Defer error in crear: {e}")
+        return
     u_id = interaction.user.id ; paid, _ = is_paid(u_id)
     if not paid and u_id != OWNER_ID:
         if load_db().get("clients", {}).get(str(u_id), {}).get("used_free"):
@@ -302,7 +312,12 @@ async def crear(interaction: discord.Interaction, region: str, prefijo: str = "Z
 
 @bot.tree.command(name="info")
 async def info(interaction: discord.Interaction):
-    if not interaction.response.is_done(): await interaction.response.defer()
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+    except Exception as e:
+        print(f"Defer error in info: {e}")
+        return
     paid, tl = is_paid(interaction.user.id)
     emb = discord.Embed(title="👤 PERFIL", color=0x3498DB)
     emb.add_field(name="💼 Estado", value="`PREMIUM`" if paid else "`FREE`")
