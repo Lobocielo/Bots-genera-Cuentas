@@ -1,0 +1,7 @@
+discord.py
+requests
+pycryptodome
+pyjwt
+protobuf_decoder
+colorama
+psutil
