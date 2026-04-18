@@ -1062,6 +1062,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     app_commands.Choice(name="South America (SAC)", value="SAC")
 ])
 async def crear(interaction: discord.Interaction, region: str, prefijo: str = "ZENIHT", cantidad: int = 1):
+    await interaction.response.defer()
     user_id = interaction.user.id
     paid, time_left = is_paid(user_id)
     used_free = has_used_free_trial(user_id)
@@ -1083,10 +1084,9 @@ async def crear(interaction: discord.Interaction, region: str, prefijo: str = "Z
                 await owner.send(f"🔔 **Interés de compra:** El usuario `{interaction.user}` (ID: `{user_id}`) intentó usar el bot pero ya expiró su prueba gratuita.")
             except: pass
             
-        await interaction.response.send_message(embed=embed_pay, ephemeral=True)
+        await interaction.followup.send(embed=embed_pay, ephemeral=True)
         return
 
-    await interaction.response.defer()
     
     embed_init = discord.Embed(
         title="✨ ZENIHT FF Generator",
@@ -1176,8 +1176,9 @@ async def crear(interaction: discord.Interaction, region: str, prefijo: str = "Z
 @bot.tree.command(name="add_client", description="Añadir cliente a la lista blanca (Solo Dueño)")
 @app_commands.describe(user_id="ID de Discord del cliente", tiempo="Ejemplo: 7d (días) o 1m (mes)")
 async def add_client(interaction: discord.Interaction, user_id: str, tiempo: str):
+    await interaction.response.defer()
     if interaction.user.id != OWNER_ID:
-        await interaction.response.send_message("❌ No tienes permisos para usar este comando.", ephemeral=True)
+        await interaction.followup.send("❌ No tienes permisos para usar este comando.", ephemeral=True)
         return
 
     db = load_db()
@@ -1189,7 +1190,7 @@ async def add_client(interaction: discord.Interaction, user_id: str, tiempo: str
     elif tiempo.endswith('m'):
         expiry = now + timedelta(days=int(tiempo[:-1]) * 30)
     else:
-        await interaction.response.send_message("❌ Formato inválido. Usa `7d` para días o `1m` para meses.", ephemeral=True)
+        await interaction.followup.send("❌ Formato inválido. Usa `7d` para días o `1m` para meses.", ephemeral=True)
         return
 
     db[str(user_id)] = {
@@ -1205,10 +1206,11 @@ async def add_client(interaction: discord.Interaction, user_id: str, tiempo: str
         color=discord.Color.green()
     )
     embed.add_field(name="⏳ Expiración", value=f"`{expiry.strftime('%d/%m/%Y %H:%M')}`", inline=True)
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="info", description="Muestra tu estado actual")
 async def info(interaction: discord.Interaction):
+    await interaction.response.defer()
     paid, time_left = is_paid(interaction.user.id)
     embed = discord.Embed(
         title="★ ZENIHT ✦ Perfil",
@@ -1220,17 +1222,18 @@ async def info(interaction: discord.Interaction):
         embed.add_field(name="⏳ Días restantes", value=f"`{time_left}`", inline=False)
     
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="list_clients", description="Listar todos los clientes premium (Solo Dueño)")
 async def list_clients(interaction: discord.Interaction):
+    await interaction.response.defer()
     if interaction.user.id != OWNER_ID:
-        await interaction.response.send_message("❌ No tienes permisos para usar este comando.", ephemeral=True)
+        await interaction.followup.send("❌ No tienes permisos para usar este comando.", ephemeral=True)
         return
 
     db = load_db()
     if not db:
-        await interaction.response.send_message("📂 Base de datos vacía.", ephemeral=True)
+        await interaction.followup.send("📂 Base de datos vacía.", ephemeral=True)
         return
 
     embed = discord.Embed(title="📋 Lista de Clientes Premium", color=discord.Color.blue())
@@ -1244,16 +1247,16 @@ async def list_clients(interaction: discord.Interaction):
             embed.add_field(name=f"ID: {user_id}", value=f"{status} Vence: `{exp_dt.strftime('%d/%m/%Y')}`", inline=True)
         if count >= 25: break
     
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="broadcast", description="Enviar mensaje global a todos los clientes (Solo Dueño)")
 @app_commands.describe(mensaje="Mensaje a enviar")
 async def broadcast(interaction: discord.Interaction, mensaje: str):
+    await interaction.response.defer()
     if interaction.user.id != OWNER_ID:
-        await interaction.response.send_message("❌ No tienes permisos.", ephemeral=True)
+        await interaction.followup.send("❌ No tienes permisos.", ephemeral=True)
         return
     
-    await interaction.response.defer()
     db = load_db()
     success = 0
     for user_id in db:
