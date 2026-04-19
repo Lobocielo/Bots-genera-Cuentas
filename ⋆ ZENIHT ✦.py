@@ -35,7 +35,7 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from colorama import Fore, Style
 import colorama
-from datetime import datetime
+from datetime import datetime, timedelta
 import datetime as dt
 
 colorama.init(autoreset=True)
@@ -323,6 +323,73 @@ async def info(interaction: discord.Interaction):
     emb.add_field(name="💼 Estado", value="`PREMIUM`" if paid else "`FREE`")
     emb.add_field(name="⏳ Días", value=f"`{tl}`")
     await interaction.followup.send(embed=emb)
+
+@bot.tree.command(name="add_client", description="Añadir cliente premium (Solo Dueño)")
+@app_commands.describe(user_id="ID de Discord del cliente", tiempo="Ejemplo: 7d (días) o 1m (mes)")
+async def add_client(interaction: discord.Interaction, user_id: str, tiempo: str):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message("❌ No tienes permisos.", ephemeral=True) ; return
+    
+    db = load_db() ; now = dt.datetime.now()
+    if tiempo.endswith('d'): expiry = now + timedelta(days=int(tiempo[:-1]))
+    elif tiempo.endswith('m'): expiry = now + timedelta(days=int(tiempo[:-1]) * 30)
+    else: await interaction.response.send_message("❌ Formato inválido. Usa `7d` o `1m`.", ephemeral=True) ; return
+
+    if "clients" not in db: db["clients"] = {}
+    db["clients"][str(user_id)] = {"expiry": expiry.isoformat(), "added_at": now.isoformat(), "used_free": True}
+    save_db(db)
+    
+    emb = discord.Embed(title="✅ CLIENTE AÑADIDO", color=0x2ECC71)
+    emb.add_field(name="👤 Usuario", value=f"<@{user_id}>")
+    emb.add_field(name="⏳ Expiración", value=f"`{expiry.strftime('%d/%m/%Y %H:%M')}`")
+    await interaction.response.send_message(embed=emb)
+
+@bot.tree.command(name="list_clients", description="Listar clientes premium (Solo Dueño)")
+async def list_clients(interaction: discord.Interaction):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message("❌ No tienes permisos.", ephemeral=True) ; return
+    
+    db = load_db() ; clients = db.get("clients", {})
+    if not clients: await interaction.response.send_message("📂 Base de datos vacía.", ephemeral=True) ; return
+
+    emb = discord.Embed(title="📋 CLIENTES PREMIUM", color=0x3498DB)
+    for u_id, data in list(clients.items())[:25]:
+        exp = data.get("expiry")
+        if exp:
+            exp_dt = dt.datetime.fromisoformat(exp)
+            status = "✅" if dt.datetime.now() < exp_dt else "❌"
+            emb.add_field(name=f"ID: {u_id}", value=f"{status} Vence: `{exp_dt.strftime('%d/%m/%Y')}`", inline=True)
+    await interaction.response.send_message(embed=emb)
+
+@bot.tree.command(name="broadcast", description="Mensaje global a clientes (Solo Dueño)")
+async def broadcast(interaction: discord.Interaction, mensaje: str):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message("❌ No tienes permisos.", ephemeral=True) ; return
+    
+    await interaction.response.defer() ; db = load_db() ; success = 0
+    for u_id in db.get("clients", {}):
+        try:
+            user = await bot.fetch_user(int(u_id))
+            emb = discord.Embed(title="📢 AVISO DE ZENIHT", description=mensaje, color=0x9B59B6)
+            await user.send(embed=emb) ; success += 1
+        except: continue
+    await interaction.followup.send(f"✅ Enviado a {success} usuarios.")
+
+@bot.tree.command(name="announce", description="Anuncio oficial con mención")
+async def announce(interaction: discord.Interaction):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message("❌ No tienes permisos.", ephemeral=True) ; return
+    
+    emb = discord.Embed(title="📢 ✧ ANUNCIO OFICIAL ZENIHT ✧", color=0xFF4500, description=(
+        "**¡HOLA A TODOS!**\n\n"
+        "EL BOT **GENERADOR DE CUENTAS** YA ESTÁ DISPONIBLE PARA GENERAR CUENTAS EN CUALQUIER REGIÓN. ✨\n\n"
+        "💬 **¿DUDAS?** SI TIENES DUDAS O ALGÚN PROBLEMA, NO DUDES EN PREGUNTAR.\n\n"
+        "🛒 **COMPRAR PERMANENTE:** SI DESEAS COMPRAR EL BOT DE FORMA PERMANENTE, AVÍSAME.\n\n"
+        "👤 **PROPIETARIO:** EL ÚNICO AUTORIZADO PARA HACER MÁS CUENTAS ES **MEME** (DUEÑO)."
+    ))
+    emb.set_thumbnail(url="https://i.imgur.com/8QWv8Wk.png")
+    emb.set_footer(text="ZENIHT Official | Calidad y Seguridad")
+    await interaction.response.send_message(content="@everyone @here", embed=emb)
 
 if __name__ == "__main__":
     if not TOKEN: print("TOKEN missing") ; sys.exit(1)
